@@ -18,7 +18,7 @@ clean: clean-certs
 	-rm -f .*.key
 	- rm -f .*.key.pub
 
-provision: install-ssh-keys copy-files provision-masters provision-workers
+provision: install-ssh-keys certs copy-files provision-masters provision-workers
 
 provision-masters: $(addprefix provision-master-,$(subst .local,,$(MASTER_NODES)))
 provision-master-%:
@@ -48,7 +48,7 @@ uptime-%:
 get-host-ips-json:
 	@./util/bonjour_to_ip_json.sh $(HOSTS) | jq .
 
-install-ssh-keys: $(addprefix install-ssh-key-, $(HOSTS))
+install-ssh-keys: $(addprefix install-ssh-key-, $(subst .local,,$(HOSTS)))
 
 install-ssh-key-%: .id_rsa_%.key
 	$(warning NOTE: default password is: hypriot)
@@ -89,7 +89,8 @@ copy-scripts: $(addprefix copy-scripts-,$(subst .local,,$(HOSTS)))
 copy-scripts-%:
 	scp -i ${PWD}/.id_rsa_$*.key scripts/* pirate@$*.local:~/
 
-copy-bin: $(addprefix copy-etcd-,$(subst .local,,$(HOSTS))) $(addprefix copy-hyperkube-,$(subst .local,,$(HOSTS))) $(addprefix copy-cni-,$(subst .local,,$(HOSTS)))
+bin-files: bin/etcd bin/etcdctl bin/hyperkube cni
+copy-bin: bin-files $(addprefix copy-etcd-,$(subst .local,,$(HOSTS))) $(addprefix copy-hyperkube-,$(subst .local,,$(HOSTS))) $(addprefix copy-cni-,$(subst .local,,$(HOSTS)))
 
 copy-files: copy-certs copy-scripts copy-bin
 

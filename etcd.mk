@@ -1,4 +1,8 @@
+.PHONY: etcd
+
 ETCD_ARM_IMAGE := gcr.io/google_containers/etcd-arm:2.2.1
+
+etcd: bin/etcd bin/etcdctl
 
 bin/etcd:
 	@mkdir -p bin
