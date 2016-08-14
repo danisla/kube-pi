@@ -134,3 +134,5 @@ sudo systemctl enable kube-proxy
 sudo systemctl start kube-proxy
 
 sleep 5 && sudo systemctl status kube-proxy --no-pager
+
+echo "INFO: worker component setup complete."
