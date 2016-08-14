@@ -29,7 +29,7 @@ Run this to flash all of the SD cards for each node (prompted for each one):
 make
 ```
 
-> Note, until the hypriot image adds cgroup_enable=cpuset to /boot/cmdline.txt, you should do this manually before booting or the kubelet service won't start. see also: https://github.com/kubernetes/kubernetes/issues/26038
+> Note, until the hypriot image adds `cgroup_enable=cpuset` to /boot/cmdline.txt, you should do this manually before booting or the kubelet service won't start. see also: https://github.com/kubernetes/kubernetes/issues/26038
 
 Insert SD card to each PI and boot them, make sure networking is working properly before continuing.
 

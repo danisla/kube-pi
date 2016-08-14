@@ -43,9 +43,9 @@ sudo docker version
 
 ### Kubelet ###
 
-sudo mkdir -p /opt/cni
-sudo cp cni/* /opt/cni/
-sudo chmod +x /opt/cni/*
+sudo mkdir -p /opt/cni/bin
+sudo cp cni/* /opt/cni/bin/
+sudo chmod +x /opt/cni/bin/*
 
 sudo cp hyperkube /usr/bin/
 sudo chmod +x /usr/bin/hyperkube

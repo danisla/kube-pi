@@ -21,13 +21,16 @@ clean: clean-certs
 provision: provision-masters provision-workers
 
 provision-masters: $(addprefix provision-master-,$(subst .local,,$(MASTER_NODES)))
-provision-master-%: install-ssh-keys certs copy-files
+provision-master-%: bin-files certs install-ssh-key-% copy-files-%
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_etcd.sh $(shell make port-ips-$*)"'
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_master.sh $(shell make port-ips-$*)"'
 
 provision-workers: $(addprefix provision-worker-,$(subst .local,,$(WORKER_NODES)))
-provision-worker-%: port-vars install-ssh-keys certs copy-files
+provision-worker-%: port-vars bin-files certs install-ssh-key-% copy-files-%
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_worker.sh $(shell make port-ips-$*) $(shell make port-ips-kpi-master)"'
+
+clean-provision-%:
+	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "rm -Rf ~/*.pem ~/hyperkube ~/etcd* ~/cni ~/provison_*.sh"'
 
 $(FLASH):
 	wget -O $@ https://raw.githubusercontent.com/hypriot/flash/master/$(shell uname -s)/flash
@@ -66,7 +69,10 @@ ssh-%:
 port-vars: $(addprefix port-ips-,$(HOST_PREFIXES))
 port-ips-%:
 	$(eval port_ips_$* = $(shell ./util/bonjour_to_ip_json.sh $(HOSTS) | jq '.[] | select(.hostname | startswith("$*")) | .ip'))
-	@echo $(port_ips_$*)
+	@if [[ "$(port_ips_$*)" == "" ]]; then echo "ERROR: could not get IP for $*" ; exit 1 ; else \
+		echo $(port_ips_$*) ; \
+	fi
+
 
 certs: port-vars
 	@mkdir -p certs
@@ -81,18 +87,18 @@ test-cert-%:
 
 copy-certs: $(addprefix copy-certs-,$(subst .local,,$(HOSTS)))
 copy-certs-%:
-	scp -i ${PWD}/.id_rsa_$*.key certs/ca.pem pirate@$*.local:~/ca.pem
-	scp -i ${PWD}/.id_rsa_$*.key certs/$*,*,127.0.0.1.pem pirate@$*.local:~/kubernetes.pem
-	scp -i ${PWD}/.id_rsa_$*.key certs/$*,*,127.0.0.1-key.pem pirate@$*.local:~/kubernetes-key.pem
+	scp -r -i ${PWD}/.id_rsa_$*.key certs/ca.pem pirate@$*.local:~/ca.pem
+	scp -r -i ${PWD}/.id_rsa_$*.key certs/$*,*,127.0.0.1.pem pirate@$*.local:~/kubernetes.pem
+	scp -r -i ${PWD}/.id_rsa_$*.key certs/$*,*,127.0.0.1-key.pem pirate@$*.local:~/kubernetes-key.pem
 
 copy-scripts: $(addprefix copy-scripts-,$(subst .local,,$(HOSTS)))
 copy-scripts-%:
 	scp -i ${PWD}/.id_rsa_$*.key scripts/* pirate@$*.local:~/
 
 bin-files: bin/etcd bin/etcdctl bin/hyperkube cni
-copy-bin: bin-files $(addprefix copy-etcd-,$(subst .local,,$(HOSTS))) $(addprefix copy-hyperkube-,$(subst .local,,$(HOSTS))) $(addprefix copy-cni-,$(subst .local,,$(HOSTS)))
 
-copy-files: copy-certs copy-scripts copy-bin
+copy-files-%: copy-certs-% copy-scripts-% copy-etcd-% copy-hyperkube-% copy-cni-%
+	$(warning copied files to $*)
 
 stop-workers: $(addprefix stop-worker-,$(subst .local,,$(WORKER_NODES)))
 stop-worker-%:
