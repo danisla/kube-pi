@@ -53,7 +53,7 @@ make provision
 
 POD networking is done by adding static routes for the cluster network on each node to all of the other nodes.
 
-Here are the example route commands for a 3 worker cluster where the `192.168.1.0` subnet is for my local network on `eth0` and the `10.200.0.0` is the K8S cluster network:
+Here are the example route commands for a cluster with 3 worker nodes. The `192.168.1.0` subnet is for my local network on the Pi's `eth0` interface and the `10.200.x.x` is the K8S cluster network:
 
 First, fetch the `podCIDR` definitions for each node:
 
