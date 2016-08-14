@@ -76,8 +76,8 @@ port-ips-%:
 
 certs: port-vars
 	@mkdir -p certs
-	$(eval MASTER_CERTS := $(shell H=($(MASTER_NODES)) IPS=($(port_ips_kpi-master)) ; for i in "$${!IPS[@]}"; do echo $${H[$$i]/.local/},$${IPS[$$i]},$(SERVICE_CLUSTER_IP),localhost,127.0.0.1.pem; done))
-	$(eval WORKER_CERTS := $(shell H=($(WORKER_NODES)) IPS=($(port_ips_kpi-worker)) ; for i in "$${!IPS[@]}"; do echo $${H[$$i]/.local/},$${IPS[$$i]},$(SERVICE_CLUSTER_IP),localhost,127.0.0.1.pem; done))
+	$(eval MASTER_CERTS := $(shell H=($(MASTER_NODES)) IPS=($(port_ips_kpi-master)) ; for i in "$${!IPS[@]}"; do echo $${H[$$i]},$${H[$$i]/.local/},$${IPS[$$i]},$(SERVICE_CLUSTER_IP),localhost,127.0.0.1.pem; done))
+	$(eval WORKER_CERTS := $(shell H=($(WORKER_NODES)) IPS=($(port_ips_kpi-worker)) ; for i in "$${!IPS[@]}"; do echo $${H[$$i]},$${H[$$i]/.local/},$${IPS[$$i]},$(SERVICE_CLUSTER_IP),localhost,127.0.0.1.pem; done))
 	$(MAKE) $(addprefix certs/,$(MASTER_CERTS)) $(addprefix certs/,$(WORKER_CERTS))
 	cp ca.pem certs/ca.pem
 
@@ -110,6 +110,33 @@ stop-master-%: $(addprefix stop-master-,$(subst .local,,$(MASTER_NODES)))
 
 clean-etcd-%:
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'sudo rm -Rf /var/lib/etcd/member'
+
+logs-worker-%:
+	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'sudo journalctl -f -u kubelet -u kube-proxy'
+
+logs-master-%:
+	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'sudo journalctl -f -u kube-apiserver -u kube-controller-manager -u kube-scheduler -u etcd'
+
+pod-cidr-%:
+	@POD_CIDR=$(shell ssh -i ${PWD}/.id_rsa_*master.key -t pirate@$(shell make port-ips-kpi-master) '/usr/bin/hyperkube kubectl get nodes -o json' 2>/dev/null | jq -rc '.items[].spec | select(.externalID == "$*") | .podCIDR') && \
+	if [[ "$$POD_CIDR" == "" ]]; then echo "ERROR: Could not get pod cidr for $*" ; exit 1 ; else echo $$POD_CIDR ; fi
+
+route-%:
+	@POD_CIDR=$(shell make pod-cidr-$*) && HOST_IP=$(shell make port-ips-$*) && echo "sudo route add -net $$POD_CIDR gw $$HOST_IP dev eth0"
+
+get-worker-routes:
+	@for node in $(subst .local,,$(WORKER_NODES)); do \
+		make route-$$node ; \
+	done
+
+add-routes: $(addprefix add-routes-,$(subst .local,,$(WORKER_NODES)))
+add-routes-%:
+	$(eval MY_CIDR := $(shell make pod-cidr-$*))
+	-@ROUTES="$(shell $(MAKE) get-worker-routes | grep -v $(MY_CIDR) | tr '\n' ';')" && echo "$$ROUTES" ; \
+	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local "$$ROUTES"
+
+get-routes-%:
+	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local "sudo netstat -rn"
 
 include cfssl.mk
 include etcd.mk

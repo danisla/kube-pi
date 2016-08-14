@@ -49,6 +49,55 @@ Run this to generate and copy ssh keys, copy all files and run the scripts:
 make provision
 ```
 
+## Networking
+
+POD networking is done by adding static routes for the cluster network on each node to all of the other nodes.
+
+Here are the example route commands for a 3 worker cluster where the `192.168.1.0` subnet is for my local network on `eth0` and the `10.200.0.0` is the K8S cluster network:
+
+First, fetch the `podCIDR` definitions for each node:
+
+```
+$ hyperkube kubectl get nodes -o json | jq '.items[].spec'
+{
+  "podCIDR": "10.200.0.0/24",
+  "externalID": "kpi-worker0"
+}
+{
+  "podCIDR": "10.200.1.0/24",
+  "externalID": "kpi-worker1"
+}
+{
+  "podCIDR": "10.200.2.0/24",
+  "externalID": "kpi-worker2"
+}
+```
+
+The `route add` commands for `kpi-worker0`:
+
+```
+sudo route add -net 10.200.1.0/24 gw 192.168.1.20 dev eth0
+sudo route add -net 10.200.2.0/24 gw 192.168.1.123 dev eth0
+```
+
+The `route add` commands for `kpi-worker1`:
+
+```
+sudo route add -net 10.200.0.0/24 gw 192.168.1.124 dev eth0
+sudo route add -net 10.200.2.0/24 gw 192.168.1.123 dev eth0
+```
+
+The `route add` commands for `kpi-worker2`:
+
+```
+sudo route add -net 10.200.0.0/24 gw 192.168.1.124 dev eth0
+sudo route add -net 10.200.1.0/24 gw 192.168.1.20 dev eth0
+```
+
+This is all automated when you run `make add-routes` after provisioning all of the nodes.
+
+> NOTE: Trying to ping the `10.200.0.0/16` addresses from other workers may give strange results if the `cbr0` interface hasn't been created yet on the destination host, this is created automatically by the kubelet the first time a container is run.
+
 ## TODO
 
 - [ ] DNS setup
