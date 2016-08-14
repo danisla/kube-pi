@@ -1,0 +1,48 @@
+# Service to access test service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  clusterIP: 10.32.0.80
+  ports:
+  - port: 80
+    name: web
+  selector:
+    app: netutils-nginx
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: netutils-nginx
+  namespace: default
+  labels:
+    app: netutils-nginx
+    version: v18
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 2
+  selector:
+    app: netutils-nginx
+    version: v18
+  template:
+    metadata:
+      labels:
+        app: netutils-nginx
+        version: v18
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+        - name: nginx
+          image: ckulka/rpi-nginx
+          ports:
+          - containerPort: 80
+            name: web
+            protocol: TCP
+        - name: netutils
+          image: danisla/rpi-netutils
+          command:
+            - bash
+            - -c
+            - while true; do curl -s -I -XGET http://10.32.0.80; sleep 2; done

@@ -1,0 +1,14 @@
+.*.key
+.*.key.pub
+*.img.zip
+cni
+certs/
+bin/
+
+# Cert artifacts
+ca-config.json
+ca-csr.json
+ca-key.pem
+ca.csr
+ca.pem
+module/certs
