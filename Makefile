@@ -4,7 +4,7 @@ HYPRIOT_IMAGE_URL := https://downloads.hypriot.com/hypriotos-rpi-v0.8.0.img.zip
 HYPRIOT_IMAGE := $(notdir $(HYPRIOT_IMAGE_URL))
 USER_HOME=/home/pirate
 MASTER_NODES := kpi-master.local
-WORKER_NODES := kpi-worker0.local kpi-worker1.local
+WORKER_NODES := kpi-worker0.local kpi-worker1.local kpi-worker2.local
 
 HOST_PREFIXES := kpi-master kpi-worker
 HOSTS := $(MASTER_NODES) $(WORKER_NODES)
@@ -18,15 +18,15 @@ clean: clean-certs
 	-rm -f .*.key
 	- rm -f .*.key.pub
 
-provision: install-ssh-keys certs copy-files provision-masters provision-workers
+provision: provision-masters provision-workers
 
 provision-masters: $(addprefix provision-master-,$(subst .local,,$(MASTER_NODES)))
-provision-master-%:
+provision-master-%: install-ssh-keys certs copy-files
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_etcd.sh $(shell make port-ips-$*)"'
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_master.sh $(shell make port-ips-$*)"'
 
 provision-workers: $(addprefix provision-worker-,$(subst .local,,$(WORKER_NODES)))
-provision-worker-%: port-vars
+provision-worker-%: port-vars install-ssh-keys certs copy-files
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_worker.sh $(shell make port-ips-$*) $(shell make port-ips-kpi-master)"'
 
 $(FLASH):
@@ -38,7 +38,7 @@ $(HYPRIOT_IMAGE):
 
 flash-%: $(HYPRIOT_IMAGE) $(FLASH)
 	$(warning flashing SD for host: $*)
-	flash --bootconf boot_config.txt --hostname $* $<
+	flash --hostname $* $<
 
 uptime: $(addprefix uptime-, $(subst .local,,$(HOSTS)))
 
