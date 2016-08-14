@@ -48,3 +48,8 @@ Run this to generate and copy ssh keys, copy all files and run the scripts:
 ```
 make provision
 ```
+
+## TODO
+
+- [ ] DNS setup
+- [ ] external access
