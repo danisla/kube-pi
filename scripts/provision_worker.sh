@@ -1,11 +1,16 @@
 #!/bin/bash
 
 set -e
+set -x
 
 [[ -z $1 || -z $2 ]] && echo "USAGE: $0 <internal ip> <master ip>" && exit 1
 
 export INTERNAL_IP=$1
 export MASTER_IP=$2
+
+## apt packages ##
+sudo apt-get update
+sudo apt-get install -y jq
 
 
 ### Certs ###
@@ -134,5 +139,22 @@ sudo systemctl enable kube-proxy
 sudo systemctl start kube-proxy
 
 sleep 5 && sudo systemctl status kube-proxy --no-pager
+
+## kubectl access ##
+
+hyperkube kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=/var/lib/kubernetes/ca.pem \
+  --embed-certs=true \
+  --server=https://${MASTER_IP}:6443
+
+hyperkube kubectl config set-credentials admin --token chAng3m3
+
+hyperkube kubectl config set-context default-context \
+  --cluster=kubernetes-the-hard-way \
+  --user=admin
+
+hyperkube kubectl config use-context default-context
+
+sudo sh -c "echo \"alias kubectl='hyperkube kubectl'\" >> /etc/bash.bashrc"
 
 echo "INFO: worker component setup complete."

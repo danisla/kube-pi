@@ -1,10 +1,18 @@
 #!/bin/bash
 
 set -e
+set -x
 
 [[ -z $1 ]] && echo "USAGE: $0 <internal ip>" && exit 1
 
 export INTERNAL_IP=$1
+
+## apt packages ##
+sudo apt-get update
+sudo apt-get install -y jq
+
+
+### Copy files ###
 
 sudo mkdir -p /var/lib/kubernetes
 
@@ -31,7 +39,6 @@ cat > authorization-policy.jsonl <<"EOF"
 EOF
 
 sudo mv authorization-policy.jsonl /var/lib/kubernetes/
-
 
 ### API Server ###
 
@@ -143,5 +150,7 @@ sudo systemctl start kube-scheduler
 sudo systemctl status kube-scheduler --no-pager
 
 sleep 10 && hyperkube kubectl get componentstatuses
+
+sudo sh -c "echo \"alias kubectl='hyperkube kubectl'\" >> /etc/bash.bashrc"
 
 echo "INFO: master component setup complete."

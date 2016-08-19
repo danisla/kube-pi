@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 [[ -z $1 ]] && echo "USAGE: $0 <internal ip>" && exit 1
 

@@ -24,10 +24,12 @@ provision-masters: $(addprefix provision-master-,$(subst .local,,$(MASTER_NODES)
 provision-master-%: bin-files certs install-ssh-key-% copy-files-%
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_etcd.sh $(shell make port-ips-$*)"'
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_master.sh $(shell make port-ips-$*)"'
+	$(MAKE) setup-routes-$*
 
 provision-workers: $(addprefix provision-worker-,$(subst .local,,$(WORKER_NODES)))
 provision-worker-%: port-vars bin-files certs install-ssh-key-% copy-files-%
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "bash ~/provision_worker.sh $(shell make port-ips-$*) $(shell make port-ips-kpi-master)"'
+	$(MAKE) setup-routes-$*
 
 clean-provision-%:
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local 'bash -c "rm -Rf ~/*.pem ~/hyperkube ~/etcd* ~/cni ~/provison_*.sh"'
@@ -73,7 +75,6 @@ port-ips-%:
 		echo $(port_ips_$*) ; \
 	fi
 
-
 certs: port-vars
 	@mkdir -p certs
 	$(eval MASTER_CERTS := $(shell H=($(MASTER_NODES)) IPS=($(port_ips_kpi-master)) ; for i in "$${!IPS[@]}"; do echo $${H[$$i]},$${H[$$i]/.local/},$${IPS[$$i]},$(SERVICE_CLUSTER_IP),localhost,127.0.0.1.pem; done))
@@ -88,8 +89,8 @@ test-cert-%:
 copy-certs: $(addprefix copy-certs-,$(subst .local,,$(HOSTS)))
 copy-certs-%:
 	scp -r -i ${PWD}/.id_rsa_$*.key certs/ca.pem pirate@$*.local:~/ca.pem
-	scp -r -i ${PWD}/.id_rsa_$*.key certs/$*,*,127.0.0.1.pem pirate@$*.local:~/kubernetes.pem
-	scp -r -i ${PWD}/.id_rsa_$*.key certs/$*,*,127.0.0.1-key.pem pirate@$*.local:~/kubernetes-key.pem
+	scp -r -i ${PWD}/.id_rsa_$*.key certs/$*.local,*,127.0.0.1.pem pirate@$*.local:~/kubernetes.pem
+	scp -r -i ${PWD}/.id_rsa_$*.key certs/$*.local,*,127.0.0.1-key.pem pirate@$*.local:~/kubernetes-key.pem
 
 copy-scripts: $(addprefix copy-scripts-,$(subst .local,,$(HOSTS)))
 copy-scripts-%:
@@ -121,19 +122,8 @@ pod-cidr-%:
 	@POD_CIDR=$(shell ssh -i ${PWD}/.id_rsa_*master.key -t pirate@$(shell make port-ips-kpi-master) '/usr/bin/hyperkube kubectl get nodes -o json' 2>/dev/null | jq -rc '.items[].spec | select(.externalID == "$*") | .podCIDR') && \
 	if [[ "$$POD_CIDR" == "" ]]; then echo "ERROR: Could not get pod cidr for $*" ; exit 1 ; else echo $$POD_CIDR ; fi
 
-route-%:
-	@POD_CIDR=$(shell make pod-cidr-$*) && HOST_IP=$(shell make port-ips-$*) && echo "sudo route add -net $$POD_CIDR gw $$HOST_IP dev eth0"
-
-get-worker-routes:
-	@for node in $(subst .local,,$(WORKER_NODES)); do \
-		make route-$$node ; \
-	done
-
-add-routes: $(addprefix add-routes-,$(subst .local,,$(WORKER_NODES)))
-add-routes-%:
-	$(eval MY_CIDR := $(shell make pod-cidr-$*))
-	-@ROUTES="$(shell $(MAKE) get-worker-routes | grep -v $(MY_CIDR) | tr '\n' ';')" && echo "$$ROUTES" ; \
-	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local "$$ROUTES"
+setup-routes-%:
+	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local "bash routes.sh | xargs -I {} sh -c \"sudo {} || true\""
 
 get-routes-%:
 	ssh -i ${PWD}/.id_rsa_$*.key -t pirate@$*.local "sudo netstat -rn"

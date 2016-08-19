@@ -49,6 +49,8 @@ Run this to generate and copy ssh keys, copy all files and run the scripts:
 make provision
 ```
 
+> NOTE: you will need to type in the default password `hypriot` the first time as the ssh keys are copied over.
+
 ## Networking
 
 POD networking is done by adding static routes for the cluster network on each node to all of the other nodes.
